@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-nightclub simulation
+ampersand nightclub simulation
 - simulates customer drinking behavior and service interactions
 - tracks blood alcohol content (BAC) and gimmick states
 - models queuing system with baristas and waiters
@@ -11,6 +11,7 @@ import random
 import itertools
 import heapq
 import csv
+import os
 from collections import deque
 
 # --- core parameters ---
@@ -170,6 +171,22 @@ def schedule_request(now, table, events, params):
     heapq.heappush(events, (now + delay, eid, ORDER_REQUEST, table))
 
 
+def get_unique_filename(base_name='order_log.csv'):
+    """generate a unique filename if base name already exists"""
+    if not os.path.exists(base_name):
+        return base_name
+    
+    # split filename into name and extension
+    name, ext = os.path.splitext(base_name)
+    counter = 1
+    
+    # try names with incrementing numbers until we find an unused one
+    while True:
+        new_name = f"{name}_{counter}{ext}"
+        if not os.path.exists(new_name):
+            return new_name
+        counter += 1
+
 # -----------------------------------------------------------------------------
 # Main Simulation Function
 # -----------------------------------------------------------------------------
@@ -216,7 +233,8 @@ def simulate_clvb(
     params = {'gimmick': gimmick, 'min': min_g, 'max': max_g, 'order_scale': order_scale}
 
     # CSV log
-    log = csv.writer(open('order_log.csv', 'w', newline=''))
+    log_file = get_unique_filename('order_log.csv')
+    log = csv.writer(open(log_file, 'w', newline=''))
     log.writerow(['order_id', 'stage', 'time_sec', 'wait_sec', 'svc_sec', 'idle_sec', 'time_diff'])
     oid = 0
     stats = {
