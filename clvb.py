@@ -302,8 +302,6 @@ def simulate_clvb(
             print(f" Avg Idle: {(sum(hd['idle']) / len(hd['idle']) if hd['idle'] else 0):.2f} min")
             print(f" Barista Queue: {hd['barista_count']}")  # Use accumulated count
             print(f" Waiter Queue: {hd['waiter_count']}")    # Use accumulated count
-            print(f" Avg Queue Wait (Barista): {avg_barista_wait:.2f} min")
-            print(f" Avg Queue Wait (Waiter): {avg_waiter_wait:.2f} min")
             print(f" Queue Statistics (Barista):")
             print(f"   Average Wait: {avg_barista_wait:.2f} min")
             print(f"   Maximum Wait: {max_barista_wait:.2f} min")
