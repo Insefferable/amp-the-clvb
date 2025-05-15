@@ -332,18 +332,18 @@ def simulate_clvb(
             srv.idle = True
             srv.available = now
 
-            # Collect interjection orders from nearby tables
-            bulk_orders = [tbl]
+            # Only collect interjection orders from nearby tables
+            bulk_orders = []  # Don't include original table
             for other_tbl in tables:
                 if (other_tbl != tbl and 
                     not other_tbl.pending and 
                     not other_tbl.in_service and 
                     random.random() < INTERJECTION_CHANCE):
                     other_tbl.pending = True
-                    other_tbl.in_service = True  # Mark as being served
+                    other_tbl.in_service = True
                     bulk_orders.append(other_tbl)
 
-            # Log all bulk orders as individual entries in the barista queue
+            # Only add interjection orders to barista queue
             for bulk_tbl in bulk_orders:
                 pending.append((now, bulk_tbl, 'barista'))
 
