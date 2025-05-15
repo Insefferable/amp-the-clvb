@@ -108,6 +108,7 @@ class Table:
         self.customers = []
         self.bottle_ml = 750.0  # standard bottle size
         self.pending = False
+        self.in_service = False  # New flag to track if order is being served
         self.stop_threshold = stop_threshold
         self.recent = deque()  # recent order history
         self.cooldown = 0.0
@@ -332,22 +333,25 @@ def simulate_clvb(
             srv.available = now
 
             # Collect interjection orders from nearby tables
-            bulk_orders = [tbl]  # Start with the current table
+            bulk_orders = [tbl]
             for other_tbl in tables:
-                if other_tbl != tbl and not other_tbl.pending and random.random() < INTERJECTION_CHANCE:
+                if (other_tbl != tbl and 
+                    not other_tbl.pending and 
+                    not other_tbl.in_service and 
+                    random.random() < INTERJECTION_CHANCE):
                     other_tbl.pending = True
+                    other_tbl.in_service = True  # Mark as being served
                     bulk_orders.append(other_tbl)
 
             # Log all bulk orders as individual entries in the barista queue
             for bulk_tbl in bulk_orders:
                 pending.append((now, bulk_tbl, 'barista'))
-                # Comment out waiter pings
-                # print(f"Waiter logged order for Table {bulk_tbl.id} (interjection: {bulk_tbl != tbl})")
 
         elif etype == BARISTA_SERVE:
             srv, tbl, t0 = obj
             srv.idle = True
             srv.available = now
+            tbl.in_service = False  # Clear the service flag when done
             shot = random.triangular(MIN_SHOT_VOLUME_ML, SHOT_VOLUME_ML, SHOT_VOLUME_ML)
             used = min(shot, tbl.bottle_ml)
             tbl.bottle_ml -= used
