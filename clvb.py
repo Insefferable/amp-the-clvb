@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-ampersand nightclub simulation
+nightclub simulation
 - simulates customer drinking behavior and service interactions
 - tracks blood alcohol content (BAC) and gimmick states
 - models queuing system with baristas and waiters
@@ -11,7 +11,6 @@ import random
 import itertools
 import heapq
 import csv
-import os
 from collections import deque
 
 # --- core parameters ---
@@ -108,7 +107,6 @@ class Table:
         self.customers = []
         self.bottle_ml = 750.0  # standard bottle size
         self.pending = False
-        self.in_service = False  # New flag to track if order is being served
         self.stop_threshold = stop_threshold
         self.recent = deque()  # recent order history
         self.cooldown = 0.0
@@ -142,7 +140,10 @@ def schedule_request(now, table, events, params):
     handles cooldown periods and bac limits
     """
     # check if table can place orders
-    if table.pending or now < table.cooldown:
+    if table.pending:
+        #print(f"Warning: schedule_request called for Table {table.id} which is already pending!")
+        return
+    if now < table.cooldown:
         return
         
     # check bac limits
@@ -171,22 +172,6 @@ def schedule_request(now, table, events, params):
     eid = next(event_counter)
     heapq.heappush(events, (now + delay, eid, ORDER_REQUEST, table))
 
-
-def get_unique_filename(base_name='order_log.csv'):
-    """generate a unique filename if base name already exists"""
-    if not os.path.exists(base_name):
-        return base_name
-    
-    # split filename into name and extension
-    name, ext = os.path.splitext(base_name)
-    counter = 1
-    
-    # try names with incrementing numbers until we find an unused one
-    while True:
-        new_name = f"{name}_{counter}{ext}"
-        if not os.path.exists(new_name):
-            return new_name
-        counter += 1
 
 # -----------------------------------------------------------------------------
 # Main Simulation Function
@@ -234,8 +219,7 @@ def simulate_clvb(
     params = {'gimmick': gimmick, 'min': min_g, 'max': max_g, 'order_scale': order_scale}
 
     # CSV log
-    log_file = get_unique_filename('order_log.csv')
-    log = csv.writer(open(log_file, 'w', newline=''))
+    log = csv.writer(open('order_log.csv', 'w', newline=''))
     log.writerow(['order_id', 'stage', 'time_sec', 'wait_sec', 'svc_sec', 'idle_sec', 'time_diff'])
     oid = 0
     stats = {
@@ -303,6 +287,8 @@ def simulate_clvb(
             print(f" Avg Idle: {(sum(hd['idle']) / len(hd['idle']) if hd['idle'] else 0):.2f} min")
             print(f" Barista Queue: {hd['barista_count']}")  # Use accumulated count
             print(f" Waiter Queue: {hd['waiter_count']}")    # Use accumulated count
+            print(f" Avg Queue Wait (Barista): {avg_barista_wait:.2f} min")
+            print(f" Avg Queue Wait (Waiter): {avg_waiter_wait:.2f} min")
             print(f" Queue Statistics (Barista):")
             print(f"   Average Wait: {avg_barista_wait:.2f} min")
             print(f"   Maximum Wait: {max_barista_wait:.2f} min")
@@ -316,11 +302,13 @@ def simulate_clvb(
         # Handle events
         if etype == ORDER_REQUEST:
             tbl = obj
+            if tbl.pending:
+                #print(f"Warning: ORDER_REQUEST for Table {tbl.id} which is already pending!")
+                continue  # Already has a pending order, skip
             tbl.pending = True
             dest = 'barista' if random.random() < P_DIRECT_WALK else 'waiter'
-            entry_time = now  # Track when order enters queue
+            entry_time = now
             pending.append((entry_time, tbl, dest))
-            # Increment the appropriate counter
             hr_idx = int(now // 60)
             if dest == 'barista':
                 hourly[hr_idx]['barista_count'] += 1
@@ -332,26 +320,26 @@ def simulate_clvb(
             srv.idle = True
             srv.available = now
 
-            # Only collect interjection orders from nearby tables
-            bulk_orders = []  # Don't include original table
+            # Collect interjection orders from nearby tables
+            bulk_orders = [tbl]  # Start with the current table
             for other_tbl in tables:
-                if (other_tbl != tbl and 
-                    not other_tbl.pending and 
-                    not other_tbl.in_service and 
-                    random.random() < INTERJECTION_CHANCE):
+                if other_tbl != tbl and not other_tbl.pending and random.random() < INTERJECTION_CHANCE:
                     other_tbl.pending = True
-                    other_tbl.in_service = True
                     bulk_orders.append(other_tbl)
+                #elif other_tbl != tbl and other_tbl.pending and random.random() < INTERJECTION_CHANCE:
+                    #print(f"Warning: Interjection tried to add Table {other_tbl.id} which is already pending!")
 
-            # Only add interjection orders to barista queue
+            # Log all bulk orders as individual entries in the barista queue
             for bulk_tbl in bulk_orders:
-                pending.append((now, bulk_tbl, 'barista'))
+                if bulk_tbl.pending:
+                    pending.append((now, bulk_tbl, 'barista'))
+                #else:
+                    #print(f"Warning: bulk_tbl {bulk_tbl.id} not pending when adding to queue!")
 
         elif etype == BARISTA_SERVE:
             srv, tbl, t0 = obj
             srv.idle = True
             srv.available = now
-            tbl.in_service = False  # Clear the service flag when done
             shot = random.triangular(MIN_SHOT_VOLUME_ML, SHOT_VOLUME_ML, SHOT_VOLUME_ML)
             used = min(shot, tbl.bottle_ml)
             tbl.bottle_ml -= used
