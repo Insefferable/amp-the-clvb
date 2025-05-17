@@ -26,8 +26,10 @@ DEFAULT_WEIGHT_KG = 70.0    # average customer weight
 FEMALE_BAC_MULTIPLIER = 1.25 # Badat (2023) BAC approx for women, based on water ratio
 
 # Detting (2007) BAC Elimination Rates (per minute); although diff is non significant
-ELIM_RATE_MALE_PER_HOUR = 0.0159 / 60.0    # ~0.00027 per minute
-ELIM_RATE_FEMALE_PER_HOUR = 0.0179 / 60.0  # ~0.00030 per minute
+ELIM_RATE_MALE_MEAN_PER_HOUR = 0.0159
+ELIM_RATE_MALE_STD_PER_HOUR = 0.0028
+ELIM_RATE_FEMALE_MEAN_PER_HOUR = 0.0179
+ELIM_RATE_FEMALE_STD_PER_HOUR = 0.0030
 
 # service flow controls
 BASE_RATE = 0.1             # base order generation rate
@@ -62,11 +64,14 @@ class Customer:
         
         # set gender-specific factors
         self.gender_mult = FEMALE_BAC_MULTIPLIER if gender == 'F' else 1.0
-        self.elim_rate = (
-            ELIM_RATE_FEMALE_PER_HOUR if gender == 'F' 
-            else ELIM_RATE_MALE_PER_HOUR
-        )
-        
+
+        # Sample elimination rate from normal distribution (per hour), then convert to per minute
+        if gender == 'F':
+            elim_rate_hr = max(0, random.gauss(ELIM_RATE_FEMALE_MEAN_PER_HOUR, ELIM_RATE_FEMALE_STD_PER_HOUR))
+        else:
+            elim_rate_hr = max(0, random.gauss(ELIM_RATE_MALE_MEAN_PER_HOUR, ELIM_RATE_MALE_STD_PER_HOUR))
+        self.elim_rate = elim_rate_hr / 60.0
+
         # calculate BAC increase per drink based on weight
         dL = self.weight * BLOOD_VOLUME_L_PER_KG * 10
         self.bac_inc = (
@@ -287,8 +292,6 @@ def simulate_clvb(
             print(f" Avg Idle: {(sum(hd['idle']) / len(hd['idle']) if hd['idle'] else 0):.2f} min")
             print(f" Barista Queue: {hd['barista_count']}")  # Use accumulated count
             print(f" Waiter Queue: {hd['waiter_count']}")    # Use accumulated count
-            print(f" Avg Queue Wait (Barista): {avg_barista_wait:.2f} min")
-            print(f" Avg Queue Wait (Waiter): {avg_waiter_wait:.2f} min")
             print(f" Queue Statistics (Barista):")
             print(f"   Average Wait: {avg_barista_wait:.2f} min")
             print(f"   Maximum Wait: {max_barista_wait:.2f} min")
