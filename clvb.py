@@ -3,7 +3,7 @@
 nightclub simulation
 - simulates customer drinking behavior and service interactions
 - tracks blood alcohol content (BAC) and gimmick states
-- models queuing system with baristas and waiters
+- models queuing system with bartenders and waiters
 - records performance metrics per hour
 """
 
@@ -46,7 +46,7 @@ GRIDLOCK_DURATION = 10.0    # minutes of gridlock
 event_counter = itertools.count()  # unique event id generator
 ORDER_REQUEST = 'order_request'    # new order being placed
 TAKE_ORDER = 'take_order'         # waiter taking order
-BARISTA_SERVE = 'barista_serve'   # bottle obtained
+bartender_SERVE = 'bartender_serve'   # bottle obtained
 CONSUME_DONE = 'consume_done'     # customer finished drinking
 ELIMINATE_BAC = 'eliminate_bac'   # bac reduction cycle
 
@@ -119,7 +119,7 @@ class Table:
 
 class Server:
     """
-    represents a server (barista or waiter)
+    represents a server (bartender or waiter)
     tracks availability and idle status
     """
     def __init__(self):
@@ -184,9 +184,9 @@ def schedule_request(now, table, events, params):
 def simulate_clvb(
     sim_time=300,  # 5 hours in minutes
     table_configs=[(20, 4), (7, 6), (1, 6)],
-    barista_count=4,
+    bartender_count=4,
     waiter_count=7,
-    mean_barista_min=1.0,      # 1 minute service time
+    mean_bartender_min=1.0,      # 1 minute service time
     mean_consume_min=15.0,     # 15 minutes to consume a drink
     reneger_th_min=3.0,
     reneger_prop=0.3,
@@ -216,7 +216,7 @@ def simulate_clvb(
             tables.append(t)
 
     # Initialize servers
-    baristas = [Server() for _ in range(barista_count)]
+    bartenders = [Server() for _ in range(bartender_count)]
     waiters = [Server() for _ in range(waiter_count)]
 
     # Event queue and counter
@@ -233,7 +233,7 @@ def simulate_clvb(
         'current_gridlock': False,  # Track current gridlock state
         'gridlock_end': 0.0,  # Track when current gridlock ends
         'queue_wait_times': {  # Add queue wait time tracking
-            'barista': [],
+            'bartender': [],
             'waiter': []
         }
     }
@@ -244,9 +244,9 @@ def simulate_clvb(
         'svc': [], 
         'consume': [], 
         'idle': [],
-        'barista_count': 0,  # Add counters for each queue
+        'bartender_count': 0,  # Add counters for each queue
         'waiter_count': 0,
-        'queue_wait_barista': [],  # Add queue wait tracking per hour
+        'queue_wait_bartender': [],  # Add queue wait tracking per hour
         'queue_wait_waiter': []
     } for _ in range(int(sim_time // 60) + 1)]
 
@@ -276,11 +276,11 @@ def simulate_clvb(
             n = hd['orders']
             
             # Calculate queue statistics
-            barista_waits = hd['queue_wait_barista']
+            bartender_waits = hd['queue_wait_bartender']
             waiter_waits = hd['queue_wait_waiter']
             
-            avg_barista_wait = (sum(barista_waits) / len(barista_waits) if barista_waits else 0)
-            max_barista_wait = max(barista_waits) if barista_waits else 0
+            avg_bartender_wait = (sum(bartender_waits) / len(bartender_waits) if bartender_waits else 0)
+            max_bartender_wait = max(bartender_waits) if bartender_waits else 0
             
             avg_waiter_wait = (sum(waiter_waits) / len(waiter_waits) if waiter_waits else 0)
             max_waiter_wait = max(waiter_waits) if waiter_waits else 0
@@ -290,12 +290,12 @@ def simulate_clvb(
             print(f" Avg Wait: {(sum(hd['wait']) / n if n else 0):.2f} min")
             print(f" Avg Service: {(sum(hd['svc']) / n if n else 0):.2f} min")
             print(f" Avg Idle: {(sum(hd['idle']) / len(hd['idle']) if hd['idle'] else 0):.2f} min")
-            print(f" Barista Queue: {hd['barista_count']}")  # Use accumulated count
+            print(f" bartender Queue: {hd['bartender_count']}")  # Use accumulated count
             print(f" Waiter Queue: {hd['waiter_count']}")    # Use accumulated count
-            print(f" Queue Statistics (Barista):")
-            print(f"   Average Wait: {avg_barista_wait:.2f} min")
-            print(f"   Maximum Wait: {max_barista_wait:.2f} min")
-            print(f"   Orders in Queue: {len(barista_waits)}")
+            print(f" Queue Statistics (bartender):")
+            print(f"   Average Wait: {avg_bartender_wait:.2f} min")
+            print(f"   Maximum Wait: {max_bartender_wait:.2f} min")
+            print(f"   Orders in Queue: {len(bartender_waits)}")
             print(f" Queue Statistics (Waiter):")
             print(f"   Average Wait: {avg_waiter_wait:.2f} min")
             print(f"   Maximum Wait: {max_waiter_wait:.2f} min")
@@ -309,12 +309,12 @@ def simulate_clvb(
                 #print(f"Warning: ORDER_REQUEST for Table {tbl.id} which is already pending!")
                 continue  # Already has a pending order, skip
             tbl.pending = True
-            dest = 'barista' if random.random() < P_DIRECT_WALK else 'waiter'
+            dest = 'bartender' if random.random() < P_DIRECT_WALK else 'waiter'
             entry_time = now
             pending.append((entry_time, tbl, dest))
             hr_idx = int(now // 60)
-            if dest == 'barista':
-                hourly[hr_idx]['barista_count'] += 1
+            if dest == 'bartender':
+                hourly[hr_idx]['bartender_count'] += 1
             else:
                 hourly[hr_idx]['waiter_count'] += 1
 
@@ -332,14 +332,14 @@ def simulate_clvb(
                 #elif other_tbl != tbl and other_tbl.pending and random.random() < INTERJECTION_CHANCE:
                     #print(f"Warning: Interjection tried to add Table {other_tbl.id} which is already pending!")
 
-            # Log all bulk orders as individual entries in the barista queue
+            # Log all bulk orders as individual entries in the bartender queue
             for bulk_tbl in bulk_orders:
                 if bulk_tbl.pending:
-                    pending.append((now, bulk_tbl, 'barista'))
+                    pending.append((now, bulk_tbl, 'bartender'))
                 #else:
                     #print(f"Warning: bulk_tbl {bulk_tbl.id} not pending when adding to queue!")
 
-        elif etype == BARISTA_SERVE:
+        elif etype == bartender_SERVE:
             srv, tbl, t0 = obj
             srv.idle = True
             srv.available = now
@@ -359,7 +359,7 @@ def simulate_clvb(
                 eid = next(event_counter)
                 heapq.heappush(events, (now + ctime, eid, CONSUME_DONE, tbl))
             # else:
-                # Comment out barista pings
+                # Comment out bartender pings
                 # print(f"Customer {cust.id} at Table {tbl.id} has BAC >= 0.5 and stops drinking.")
 
         elif etype == CONSUME_DONE:
@@ -403,7 +403,7 @@ def simulate_clvb(
                 hourly[hr_idx]['queue_wait_waiter'].append(queue_wait)
                 
                 wait_t = start - entry_time
-                svc_min = random.expovariate(1 / mean_barista_min)
+                svc_min = random.expovariate(1 / mean_bartender_min)
                 oid += 1
                 log.writerow([
                     oid, 'waiter', f"{start * 60:.2f}", f"{wait_t * 60:.2f}",
@@ -423,17 +423,17 @@ def simulate_clvb(
                 eid = next(event_counter)
                 heapq.heappush(events, (finish, eid, TAKE_ORDER, (w, tbl, entry_time)))
 
-        # Update barista assignment to process orders individually
-        for b in baristas:
-            if b.idle and pending and pending[0][2] == 'barista':
+        # Update bartender assignment to process orders individually
+        for b in bartenders:
+            if b.idle and pending and pending[0][2] == 'bartender':
                 entry_time, tbl, _ = pending.popleft()
                 start = max(now, b.available)
                 queue_wait = (start - entry_time)  # Time in queue before service
                 
                 # Log queue wait time
-                stats['queue_wait_times']['barista'].append(queue_wait)
+                stats['queue_wait_times']['bartender'].append(queue_wait)
                 hr_idx = int(now // 60)
-                hourly[hr_idx]['queue_wait_barista'].append(queue_wait)
+                hourly[hr_idx]['queue_wait_bartender'].append(queue_wait)
                 
                 wait_t = start - entry_time
                 if wait_t > reneger_th_min and random.random() < reneger_prop:
@@ -443,10 +443,10 @@ def simulate_clvb(
                     eid = next(event_counter)
                     heapq.heappush(events, (start, eid, ORDER_REQUEST, tbl))
                     continue
-                svc_min = random.expovariate(1 / mean_barista_min)
+                svc_min = random.expovariate(1 / mean_bartender_min)
                 oid += 1
                 log.writerow([
-                    oid, 'barista', f"{start * 60:.2f}", f"{wait_t * 60:.2f}",
+                    oid, 'bartender', f"{start * 60:.2f}", f"{wait_t * 60:.2f}",
                     f"{svc_min * 60:.2f}", f"{(now - b.available) * 60:.2f}", f"{(start - entry_time) * 60:.2f}"
                 ])
                 stats['wait'].append(wait_t)
@@ -461,7 +461,7 @@ def simulate_clvb(
                 finish = start + svc_min
                 b.available = finish
                 eid = next(event_counter)
-                heapq.heappush(events, (finish, eid, BARISTA_SERVE, (b, tbl, entry_time)))
+                heapq.heappush(events, (finish, eid, bartender_SERVE, (b, tbl, entry_time)))
 
         # Add gridlock check to main loop
         if stats['current_gridlock'] and now >= stats['gridlock_end']:
@@ -475,8 +475,8 @@ def simulate_clvb(
         print(f"Avg Service: {sum(stats['svc']) / len(stats['svc']):.2f} min")
     if stats['idle']:
         print(f"Avg Idle: {sum(stats['idle']) / len(stats['idle']):.2f} min")
-    if stats['queue_wait_times']['barista']:
-        print(f"Avg Queue Wait (Barista): {sum(stats['queue_wait_times']['barista']) / len(stats['queue_wait_times']['barista']):.2f} min")
+    if stats['queue_wait_times']['bartender']:
+        print(f"Avg Queue Wait (bartender): {sum(stats['queue_wait_times']['bartender']) / len(stats['queue_wait_times']['bartender']):.2f} min")
     if stats['queue_wait_times']['waiter']:
         print(f"Avg Queue Wait (Waiter): {sum(stats['queue_wait_times']['waiter']) / len(stats['queue_wait_times']['waiter']):.2f} min")
 
